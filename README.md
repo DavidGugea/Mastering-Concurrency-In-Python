@@ -322,4 +322,6 @@ This diagram further illustrates this setup:
 
 ![Queuing in Threading](ScreenshotsForNotes/Chapter3/QueueingInThreading.PNG)
 
+# 4. Using the with Statement in Threads
 
+\-

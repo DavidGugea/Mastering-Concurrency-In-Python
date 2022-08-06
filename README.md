@@ -141,3 +141,185 @@ Now, if we were to reverse this sequence for choosing resources, in which we imp
 Another similarity between Amdahl's Law and the law of diminishing returns concerns the improvement in speedup obtained through adding more processors to a system. Specifically, as a new processor is added to the system to process a fixed-size task, it will offer less usable computation power than the previous processor. As we discussed in the last section, the improvement in this situation strictly decreases as the number of processors increases, and the total throughout approaches the upper boundary of 1/B.
 
 It is important to note that this analysis does not take into account other potential bottlenecks, such as memory bandwidth and I/O bandwidth. In fact, if these resources do not scale with the number of processors, then simply adding processors results in even lower returns
+
+# 3. Working with Threads in Python
+
+## The concept of a thread
+
+In the field of computer science, a thread of execution is the smallest unit of programming commands (code) that a scheduler (usually as part of an operating system) can process and manage. Depending on the operating system, the implementation of threads and processes (which we will cover in future chapters) varies, but a thread is typically an element (a component) of a process.
+
+## Threads versus processes
+
+More than one thread can be implemented within the same process, most often executing concurrently and accessing/sharing the same resources, such as memory; separate processes do not do this. Threads in the same process share the latter's instructions (its code) and context (the values that its variables reference at any given moment).
+
+The key difference between the two concepts is that a thread is typically a component of a process. Therefore, one process can include multiple threads, which can be executing simultaneously. Threads also usually allow for shared resources, such as memory and data, while it is fairly rare for processes to do so. In short, a thread is an independent component of computation that is similar to a process, but the threads within a process can share the address space, and hence the data, of that process:
+
+![Process Vs Thread](ScreenshotsForNotes/Chapter3/ProcessVsThread.PNG)
+
+## Multithreading
+
+In computer science, single-threading is similar to traditional sequential processing, executing a single command at any given time. On the other hand, multithreading implements more than one thread to exist and execute in a single process, simultaneously. By allowing multiple threads to access shared resources/contexts and be executed independently, this programming technique can help applications to gain speed in the execution of independent tasks.
+
+Multithreading can primarily be achieved in two ways. In single-processor systems, multithreading is typically implemented via time slicing, a technique that allows the CPU to switch between different software running on different threads. In time slicing, the CPU switches its execution so quickly and so often that users usually perceive that the software is running in parallel (for example, when you open two different software at the same time on a single-processor computer):
+
+![Time Slicing](ScreenshotsForNotes/Chapter3/TimeSlicing.PNG)
+
+As opposed to single-processor systems, systems with multiple processors or cores can easily implement multithreading, by executing each thread in a separate process or core, simultaneously. Additionally, time slicing is an option, as these multiprocess or multicore systems can have only one processor/core to switch between tasks—although this is generally not a good practice.
+
+Multithreaded applications have a number of advantages, as compared to traditional sequential applications; some of them are listed as follows:
+
+* Faster execution time: One of the main advantages of concurrency through multithreading is the speedup that is achieved. Separate threads in the same program can be executed concurrently or in parallel, if they are sufficiently independent of one another.
+
+* Responsiveness: A single-threaded program can only process one piece of input at a time; therefore, if the main execution thread blocks on a long-running task (that is, a piece of input that requires heavy computation and processing), the whole program will not be able to continue with other input, and hence, it will appear to be frozen. By using separate threads to perform computation and remain running to take in different user input simultaneously, a multithreaded program can provide better responsiveness.
+
+* Efficiency in resource consumption: As we mentioned previously, multiple threads within the same process can share and access the same resources. Consequently, multithreaded programs can serve and process many client requests for data concurrently, using significantly fewer resources than would be needed when using single-threaded or multiprocess programs. This also leads to quicker communication between threads.
+
+That being said, multithreaded programs also have their disadvantages, as follows:
+
+* Crashes: Even though a process can contain multiple threads, a single illegal operation within one thread can negatively affect the processing of all of the other threads in the process, and can crash the entire program as a result.
+
+* Synchronization: Even though sharing the same resources can be an advantage over traditional sequential programming or multiprocessing programs, careful consideration is also needed for the shared resources. Usually, threads must be coordinated in a deliberate and systematic manner, so that shared data is computed and manipulated correctly. Unintuitive problems that can be caused by careless thread coordination include deadlocks, livelocks, and race conditions, all of which will be discussed in future chapters.
+
+## The threading module in Python 3
+
+The thread module considers each thread a function; when the thread.start_new_thread() is called, it actually takes in a separate function as its main argument, in order to spawn a new thread. However, the threading module is designed to be user-friendly for those that come from the object-oriented software development paradigm, treating each thread that is created as an object.
+
+In addition to all of the functionality for working with threads that the thread module provides, the threading module supports a number of extra methods, as follows:
+
+* threading.activeCount(): This function returns the number of currently active thread objects in the program
+
+* threading.currentThread(): This function returns the number of thread objects in the current thread control from the caller
+
+* threading.enumerate(): This function returns a list of all of the currently active thread objects in the program
+
+Following the object-oriented software development paradigm, the threading module also provides a Thread class that supports the object-oriented implementation of threads. The following methods are supported in this class:
+
+* run(): This method is executed when a new thread is initialized and started
+
+* start(): This method starts the initialized calling thread object by calling the
+
+* run() method
+
+* join(): This method waits for the calling thread object to terminate before continuing to execute the rest of the program
+
+* isAlive(): This method returns a Boolean value, indicating whether the calling thread object is currently executing
+
+* getName(): This method returns the name of the calling thread object
+
+* setName(): This method sets the name of the calling thread object
+
+## Starting a thread with the threading module
+
+To create and customize a new thread using the threading module, there are specific steps that need to be followed:
+
+1. Define a subclass of the threading.Thread class in your program
+
+2. Override the default __init__(self [,args]) method inside of the subclass, in order to add custom arguments for the class
+
+3. Override the default run(self [,args]) method inside of the subclass, in order to customize the behavior of the thread class when a new thread is initialized and started
+
+Example:
+
+```Python
+import threading
+import time
+
+
+def thread_count_down(name, delay):
+  counter = 5
+
+  while counter:
+    time.sleep(delay)
+    print('Thread {0} counting down {1}'.format(name, counter))
+    counter -= 1
+
+
+class MyThread(threading.Thread):
+  def __init__(self, name, delay):
+    threading.Thread.__init__(self)
+    self.name = name
+    self.delay = delay
+        
+  def run(self):
+    print("Starting thread {0}".format(self.name))
+    thread_count_down(self.name, self.delay)
+    print("Finished thread {0}".format(self.name))
+```
+
+## The concept of thread synchronization
+
+Thread/process synchronization is a concept in computer science that specifies various mechanisms to ensure that no more than one concurrent thread/process can process and execute a particular program portion at a time; this portion is known as the critical section, and we will discuss it in further detail when we consider common problems in concurrent programming in Chapter 12, Starvation, and Chapter 13, Race Conditions.
+
+In a given program, when a thread is accessing/executing the critical section of the program, the other threads have to wait until that thread finishes executing. The typical goal of thread synchronization is to avoid any potential data discrepancies when multiple threads access their shared resources; allowing only one thread to execute the critical section of the program at a time guarantees that no data conflicts occur in multithreaded applications.
+
+## The threading.Lock class
+
+One of the most common ways to apply thread synchronization is through the implementation of a locking mechanism. In our threading module, the threading.Lock class provides a simple and intuitive approach to creating and working with locks. Its main usage includes the following methods:
+
+* threading.Lock(): This method initializes and returns a new lock object.
+
+* acquire(blocking): When this method is called, all of the threads will run synchronously (that is, only one thread can execute the critical section at a time):
+
+     * The optional argument blocking allows us to specify whether the current thread should wait to acquire the lock
+
+     * When blocking = 0, the current thread does not wait for the lock and simply returns 0 if the lock cannot be acquired by the thread, or 1 otherwise
+
+     * When blocking = 1, the current thread blocks and waits for the lock to be released and acquires it afterwards
+
+* release(): When this method is called, the lock is released.
+
+## Multithreaded priority queue
+
+A computer science concept that is widely used in both non-concurrent and concurrent programming is queuing. A queue is an abstract data structure that is a collection of different elements maintained in a specific order; these elements can be the other objects in a program.
+
+## A connection between real-life and programmatic queues
+
+Queues are an intuitive concept that can easily be related to our everyday life, such as when you stand in line to board a plane at the airport. In an actual line of people, you will see the following:
+
+* People typically enter at one end of the line and exit from the other end
+
+* If person A enters the line before person B, person A will also leave the line before person B (unless person B has more priority)
+
+* Once everyone has boarded the plane, there will be no one left in the line. In other words, the line will be empty
+
+In computer science, a queue works in a considerably similar way:
+
+* Elements can be added to the end of the queue; this task is called enqueue.
+
+* Elements can also be removed from the beginning of the queue; this task is called dequeue.
+
+* In a First In First Out (FIFO) queue, the elements that are added first will be removed first (hence, the name FIFO). This is contrary to another common data structure in computer science, called stack, in which the last element that is added will be removed first. This is known as Last In First Out (LIFO).
+
+* If all of the elements inside of a queue have been removed, the queue will be empty and there will be no way to remove further elements from the queue. Similarly, if a queue is at the maximum capacity of the number of elements it can hold, there is no way to add any other elements to the queue:
+
+![Queue Example](ScreenshotsForNotes/Chapter3/QueueExample.PNG)
+
+## The queue module
+
+The queue module in Python provides a simple implementation of the queue data structure. Each queue in the queue.Queue class can hold a specific amount of element, and can have the following methods as its high-level API:
+
+* get(): This method returns the next element of the calling queue object and removes it from the queue object
+
+* put(): This method adds a new element to the calling queue object
+
+* qsize(): This method returns the number of current elements in the calling queue object (that is, its size)
+
+* empty(): This method returns a Boolean, indicating whether the calling queue object is empty
+
+* full(): This method returns a Boolean, indicating whether the calling queue object is full
+
+## Queuing in concurrent programming
+
+The concept of a queue is even more prevalent in the sub-field of concurrent programming, especially when we need to implement a fixed number of threads in our program to interact with a varying number of shared resources.
+
+In the previous examples, we have learned to assign a specific task to a new thread. This means that the number of tasks that need to be processed will dictate the number of threads our program should spawn. (For example, in our Chapter03/example3.py file, we had five numbers as our input and we therefore created five threads—each took one input number and processed it.)
+
+Sometimes it is undesirable to have as many threads as the tasks we have to process. Say we have a large number of tasks to be processed, then it will be quite inefficient to spawn the same large number of threads and have each thread execute only one task. It could be more beneficial to have a fixed number of threads (commonly known as a thread pool) that would work through the tasks in a cooperative manner.
+
+Here is when the concept of a queue comes in. We can design a structure in which the pool of threads will not hold any information regarding the tasks they should each execute, instead the tasks are stored in a queue (in other words task queue), and the items in the queue will be fed to individual members of the thread pool. As a given task is completed by a member of the thread pool, if the task queue still contains elements to be processed, then the next element in the queue will be sent to the thread that just became available.
+
+This diagram further illustrates this setup:
+
+![Queuing in Threading](ScreenshotsForNotes/Chapter3/QueueingInThreading.PNG)
+
+

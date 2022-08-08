@@ -741,3 +741,7 @@ Using a message queue for interprocess communication is preferred over having sh
 # 7. Reduction Operators in Processes
 
 \-
+
+# 8. Concurrent Image Processing
+
+\-

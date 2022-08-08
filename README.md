@@ -806,8 +806,6 @@ As we know, in multiprocessing, multiple copies of our main program—together w
 
 Asynchronous programming, on the other hand, keeps all of the instructions of a program in the same thread and process. The main idea behind asynchronous programming is to have a single executor to switch from one task to another if it is more efficient (in terms of execution time) to simply wait for the first task while processing the second. This means that asynchronous programming will not take advantage of the multiple cores that a system might have.
 
+# 10. Implementing Asynchronous Programming in Python
 
-
-
-
-
+/-

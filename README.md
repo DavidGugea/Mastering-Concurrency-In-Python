@@ -737,3 +737,7 @@ While locks are one of the most common synchronization primitives that are used 
 Using a message queue for interprocess communication is preferred over having shared resources since, if certain processes mishandle and corrupt shared memory and resources while those resources are being shared, then there will be numerous undesirable and unpredictable consequences. If, however, a process failed to handle its message correctly, other items in the queue will remain intact. The following diagram represents the differences in architecture between using a message queue and shared resources (specifically memory) for interprocess communication:
 
 ![Queue](ScreenshotsForNotes/Chapter6/Queue.PNG)
+
+# 7. Reduction Operators in Processes
+
+\-

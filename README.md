@@ -362,3 +362,378 @@ Interestingly, making repeated, heavy-duty requests to servers is actually a for
 
 It is therefore important to space out the concurrent requests that your application makes to a server so that the application would not be considered an attacker and be potentially banned or treated as a malicious client. This could be as simple as limiting the maximum number of threads/requests that can be implemented at a time in your program or pausing the threading for a specific amount of time (for example, using the time.sleep() function) before making a request to the server.
 
+# 6. Working with Processes in Python
+
+## The concept of a process
+
+In the field of computer science, a process of execution is an instance of a specific computer program or software that is being executed by the operating system. A process contains both the program code and its current activities and interactions with other entities. Depending on the operating system, the implementation of a process can be made up of multiple threads of execution that can execute instructions concurrently or in parallel.
+
+It is important to note that a process is not equivalent to a computer program. While a program is simply a static collection of instructions (program code), a process is instead the actual execution of those instructions. This also means that the same program could be run concurrently by spawning multiple processes. These processes execute the same code from the parent program.
+
+For example, the internet browser Google Chrome usually manages a process called Google Chrome Helper for its main program in order to facilitate web browsing and other processes, to assist with various purposes. An easy way to see what different processes your system is running and managing involves using Task Manager for Windows, Activity Monitor for iOS, and System Monitor for Linux operating systems.
+
+## Processes versus threads
+
+One of the most common mistakes that programmers make when developing concurrent and parallel applications is to confuse the structure and functionalities of processes and threads. As we have seen from Chapter 3, Working with Threads in Python, a thread is the smallest unit of programming code, and is typically a component of a process. Furthermore, more than one thread can be implemented within the same process to access and share memory or other resources, while different processes do not interact in this way. This relationship is shown in the following diagram:
+
+![Process Vs Thread](ScreenshotsForNotes/Chapter6/ProcessVsThread.PNG)
+
+Since a process is a larger programming unit than a thread, it is also more complicated and consists of more programming components. A process, therefore, also requires more resources, while a thread does not and is sometimes called a lightweight process. In a typical computer system process, there are a number of main resources, as shown in the following list:
+
+* An image (or copy) of the code being executed from the parent program.
+
+* Memory associated with an instance of a program. This might include executable code, input and output for that specific process, a call stack to manage programspecific events, or a heap that contains generated computation data and is currently being used by the process during runtime.
+
+* Descriptors for the resources allocated to that specific process by the operating system. We have seen an example of these—file descriptors—in Chapter 4, Using the with Statement in Threads.
+
+* Security components of a specific process, namely the owner of the process and its permissions and allowed operations.
+
+* The processor state, also known as the process context. The context data of a process is often located in processor registers, the memory used by the process, or in control registers used by the operating system to manage the process.
+
+Because each process has a state dedicated to it, processes hold more state information than threads; multiple threads within a process in turn share process states, memory, and other various resources. For similar reasons, processes only interact with each other through system-facilitated interprocess communication methods, while threads can communicate with one another easily through shared resources.
+
+Additionally, context-switching—the act of saving the state data of a process or a thread to interrupt the execution of a task and resume it at a later time—takes more time between different processes than between different threads within the same process. However, while we have seen that communication between threads requires careful memory synchronization to ensure correct data handling, since there is less communication between separate processes, little or no memory synchronization is needed for processes.
+
+## Multiprocessing
+
+A common concept in computer science is multitasking. When multitasking, an operating system simply switches between different processes at high speed to give the appearance that these processes are being executed simultaneously, even though it is usually the case that only one process is executing on one single central processing unit (CPU) at any given time. In contrast, multiprocessing is the method of using more than one CPU to execute a task.
+
+While there are a number of different uses of the term multiprocessing, in the context of concurrency and parallelism multiprocessing refers to the execution of multiple concurrent processes in an operating system, in which each process is executed on a separate CPU, as opposed to a single process being executed at any given time. By the nature of processes, an operating system needs to have two or more CPUs in order to be able to implement multiprocessing tasks, as it needs to support many processors at the same time and allocate tasks between them appropriately.
+
+This relationship is shown in the following diagram:
+
+![Two CPU Cores](ScreenshotsForNotes/Chapter6/TwoCPUCores.PNG)
+
+We have seen in Chapter 3, Working with Threads in Python, that multithreading shares a somewhat similar definition to multiprocessing. Multithreading means that only one processor is utilized, and the system switches between tasks within that processor (also known as time slicing), while multiprocessing generally denotes the actual concurrent/parallel execution of multiple processes using multiple processors.
+
+Multiprocessing applications have enjoyed significant popularity in the field of concurrent and parallel programming. Some reasons for this are listed as follows:
+
+* Faster execution time: As we know, when done correctly concurrency always provides additional speedups for your programs, provided that some parts of them can be executed independently.
+
+* Synchronization free: Given the fact that separate processes do not share resources among themselves in a multiprocessing application, developers rarely need to spend their time coordinating the sharing and synchronization of these resources, unlike multithreaded applications, where efforts need to be made to make sure that data is being manipulated correctly.
+
+* Safety from crashes: As processes are independent from each other in terms of both computing procedures and input/output, the failure of one process will not affect the execution of another in a multiprocessing program, if handled correctly. This implies that programmers could afford to spawn a larger number of processes (that their system can still handle) and the chance of crashing the entire application would not increase.
+
+With that being said, there are also noteworthy disadvantages to using multiprocessing that we should consider, as shown in the following list:
+
+* Multiple processors are needed: Again, multiprocessing requires the operating system to have more than one CPU. Even though multiple processors are fairly common for computer systems nowadays, if yours does not have more than one, then the implementation of multiprocessing will not be possible.
+
+* Processing time and space: As mentioned before, there are many complex components involved in implementing a process and its resources. It therefore takes significant computing time and power to spawn and manage processes in comparison to doing the same with threads.
+
+## Introductory example in Python
+
+To illustrate the concept of running multiple processes on one operating system, let's look at a quick example in Python. Let's take a look at the Chapter06/example1.py file, as shown in the following code:
+
+```Python
+from multiprocessing import Process
+import time
+
+
+def count_down(name, delay):
+  print("Process {0} starting".format(name))
+
+  counter = 5
+
+  while counter:
+    time.sleep(delay)
+    print("Process {0} counting down: {1}".format(name, counter))
+    counter -= 1
+
+  print("Process {0} exiting".format(name))
+
+
+if __name__ == '__main__':
+  process1 = Process(target=count_down, args=('A', 0.5))
+  process2 = Process(target=count_down, args=('B', 0.5))
+
+  process1.start()
+  process2.start()
+
+  process1.join()
+  process2.join()
+
+  print('Done.')
+```
+
+In this file, we are going back to the counting-down example that we saw in Chapter 3, Working with Threads in Python, while we look at the concept of a thread. Our count_down() function takes in a string as a process identifier and a delay time range. It will then count down from 5 to 1 while sleeping between iterations for a number of seconds specified by the delay parameter. The function also prints out a message with the process identifier at each iteration.
+
+As we saw in Chapter 3, Working with Threads in Python, the point of this counting-down example is to show the concurrent nature of running separate tasks at the same time, this time through different processes by using the Process class from the multiprocessing module. In our main program, we initialize two processes at the same time to implement two separate time-based countdowns simultaneously. Similar to how two separate threads would do this, our two processes will carry out their own countdowns concurrently.
+
+After running the Python script, your output should be similar to the following:
+
+```bash
+Process A starting
+Process B starting
+Process A counting down: 5Process B counting down: 5
+
+Process B counting down: 4
+Process A counting down: 4
+Process A counting down: 3
+Process B counting down: 3
+Process B counting down: 2
+Process A counting down: 2
+Process B counting down: 1Process A counting down: 1
+Process A exiting
+
+Process B exiting
+Done.
+```
+
+Just as we expected, the output tells us that the two countdowns from the separate processes were executed concurrently; instead of finishing the first process' countdown and then starting the second's, the program ran the two countdowns at almost the same time. Even though processes are more expensive and contain more overhead than threads, multiprocessing also allows double the improvement in terms of speed for programs such as the preceding one.
+
+Remember that in multithreading we saw a phenomenon in which the order of the printed output changed between different runs of the program. Specifically, sometimes process B would get ahead of process A during the countdown and finish before process A, even though it was initialized later. This is, again, a direct result of implementing and starting two processes that execute the same function at almost the same time. By executing the script many times, you will see that it is quite likely for you to obtain changing output in terms of the order of the counting and the completion of the countdowns.
+
+## The process class
+
+In the multiprocessing module, processes are typically spawned and managed through the Process class. Each Process object represents an activity that executes in a separate process. Conveniently, the Process class has equivalent methods and APIs that can be found in the threading.Thread class.
+
+Specifically, utilizing an object-oriented programming approach, the Process class from multiprocessing provides the following resources:
+
+* run(): This method is executed when a new process is initialized and started
+
+* start(): This method starts the initialized calling Process object by calling the run() method
+
+* join(): This method waits for the calling Process object to terminate before continuing with the execution of the rest of the program
+
+* isAlive(): This method returns a Boolean value indicating whether the calling Process object is currently executing
+
+* name: This attribute contains the name of the calling Process object
+
+* pid: This attribute contains the process ID of the calling Process object
+
+* terminate(): This method terminates the calling Process object
+
+As you can see from our previous example, while initializing a Process object, we can pass parameters to a function and execute it in a separate process by specifying the target (for the target function) and args (for target function arguments) parameters. Note that one could also override the default Process() constructor and implement one's own run() function.
+
+As it is a major player in the multiprocessing module and in concurrency in Python in general, we will look at the Process class again in the next section.
+
+## The Pool class
+
+In the multiprocessing module, the Pool class is mainly used to implement a pool of processes, each of which will carry out tasks submitted to a Pool object. Generally, the Pool class is more convenient than the Process class, especially if the results returned from your concurrent application should be ordered.
+
+Specifically, we have seen that the order of completion for different items in a list is considerably likely to change when put through a function concurrently as the program runs over and over again. This leads to difficulty when reordering the outputs of the program with respect to the order of the inputs that produced them. One possible solution to this is to create tuples of processes and their outputs, and to sort them by process ID.
+
+This problem is addressed by the Pool class: the Pool.map() and Pool.apply() methods follow the convention of Python's traditional map() and apply() methods, ensuring that the returned values are ordered in the same way that the input is. These methods, however, block the main program until a process has finished processing. The Pool class, therefore, also has the map_async() and apply_async() functions to better assist concurrency and parallelism.
+
+## Determining the current process, waiting , and terminating processes
+
+The Process class provides a number of ways to easily interact with processes in a concurrent program. In this section, we will explore the options of managing different processes by determining the current process, waiting, and terminating processes.
+
+## Determining the current process
+
+Working with processes is at times considerably difficult, and significant debugging is therefore required. One of the methods of debugging a multiprocessing program is to identify the processes that encounter errors. As a refresher, in the previous countdown example we passed a name parameter to the count_down() function to determine where each process is during the countdown.
+
+This is, however, unnecessary as each Process object has a name parameter (with a default value) that can be changed. Naming processes is a better way to keep track of running processes than passing an identifier to the target function itself (as we did earlier), especially in applications with different types of processes running at the same time. One powerful functionality that the multiprocessing module provides is the current_process() method, which will return the Process object that is currently running at any point of a program. This is another way to keep track of running processes effectively and effortlessly.
+
+Let's look at this in more detail using an example:
+
+```Python
+from multiprocessing import Process, current_process
+import time
+
+
+def f1():
+  pname = current_process().name
+  print("Starting process {0}".format(pname))
+  time.sleep(2)
+  print("Exiting process {0}".format(pname))
+
+
+def f2():
+  pname = current_process().name
+  print("Starting process {0}".format(pname))
+  time.sleep(4)
+  print("Exiting process {0}".format(pname))
+
+
+if __name__ == '__main__':
+  p1 = Process(name='Worker 1', target=f1)
+  p2 = Process(name='Worker 2', target=f2)
+  p3 = Process(target=f1)
+
+  p1.start()
+  p2.start()
+  p3.start()
+
+  p1.join()
+  p2.join()
+  p3.join()
+```
+
+In this example, we have two dummy functions, f1() and f2(), each of which prints out the name of the process that executes the function before and after sleeping for a specified period of time. In our main program, we initialize three separate processes. The first two we name Worker 1 and Worker 2 respectively, and the last we purposefully leave blank to give it the default value of its name (that is, 'Process-3'). After running the script, you should have an output similar to the following:
+
+```bash
+Starting process Worker 1
+Starting process Worker 2
+Starting process Process-3
+Exiting process Process-3Exiting process Worker 1
+
+Exiting process Worker 2
+```
+
+We can see that the current_process() successfully helped us access the correct process that ran each function, and the third process was assigned the name Process-3 by default. Another way to keep track of the running processes in your program is to look at the individual process IDs using the os module. Let's take a look at a modified example:
+
+```Python
+from multiprocessing import Process, current_process
+import time
+import os
+
+
+def print_info(title):
+  print(title)
+
+  if hasattr(os, 'getppid'):
+    print("Parent process id: {0}".format(str(os.getppid())))
+
+  print("Current process ID: {0}".format(str(os.getpid())))
+
+
+def f():
+  print_info('Function f')
+
+  pname = current_process().name
+  print("Staring process {0}".format(pname))
+  time.sleep(1)
+  print("Ending process {0}".format(pname))
+
+
+if __name__ == '__main__':
+  print_info("Main program")
+
+  p = Process(target=f)
+  p.start()
+  p.join()
+
+  print('Done.')
+```
+
+Our main focus for this example is the print_info() function, which uses the os.getpid() and os.getppid() functions to identify the current process using its process ID. Specifically, os.getpid() returns the process ID of the current process, and os.getppid() (which is only available on Unix systems) returns the ID of the parent process. The following is my input after running the script:
+
+```bash
+Main program
+Parent process id: 30652
+Current process ID: 30316
+Function f
+Parent process id: 30316
+Current process ID: 30048
+Staring process Process-1
+Ending process Process-1
+Done.
+```
+
+## Waiting for processes
+
+Oftentimes, we'd like to wait for all of our concurrent processes to finish executing before moving to a new section of the program. As mentioned before, the Process class from the multiprocessing module provides the join() method in order to implement a way to wait until a process has completed its task and exits.
+
+However, sometimes developers want to implement processes that run in the background and do not block the main program from exiting. This specification is commonly used when there is no easy way for the main program to tell whether it is appropriate to interrupt the process at any given time, or when exiting the main program without completing the worker does not affect the end result.
+
+These processes are called daemon processes. The Process class also provides an easy option to specify whether a process is a daemon through the daemon attribute, which takes a Boolean value. The default value for the daemon attribute is False, so setting it to True will turn a given process into a daemon. Let's look at this in more detail using an example:
+
+```Python
+from multiprocessing import Process, current_process
+import time
+
+
+def f1():
+  p = current_process()
+  print("Starting process {0}, ID {1}".format(p.name, p.pid))
+  time.sleep(4)
+  print("Exiting process {0}, ID {1}".format(p.name, p.pid))
+
+
+def f2():
+  p = current_process()
+  print("Starting process {0}, ID {1}".format(p.name, p.pid))
+  time.sleep(2)
+  print("Exiting process {0}, ID {1}".format(p.name, p.pid))
+
+
+if __name__ == '__main__':
+  p1 = Process(name='Worker 1', target=f1)
+  p1.daemon = True
+  p2 = Process(name='Worker 2', target=f2)
+
+  p1.start()
+  time.sleep(1)
+  p2.start()
+```
+
+In this example, we have a long-running function (represented by f1(), which has a sleep period of 4 seconds) and a faster function (represented by f2(), which has a sleep period of only 2 seconds). We also have two separate processes, as shown in the following list:
+
+* The p1 process, which is a daemon process assigned to run f1()
+
+* The p2 process, which is a regular process assigned to run f2()
+
+In our main program, we start both processes without calling the join() method on either of them at the end of the program. Since p1 is a long-running process, it will most likely not finish executing before p2 (which is the faster process of the two) finishes. We also know that p1 is a daemon process, so our program should exit before it finishes executing. After running the Python script, your output should be similar to the following code:
+
+```bash
+Starting process Worker 1, ID 34956
+Starting process Worker 2, ID 34460
+Exiting process Worker 2, ID 34460
+```
+
+Again, even though the process IDs might be different when you yourself run the script, the general format of the output should be the same. As we can see, the output is consistent with what we discussed: both p1 and p2 processes were initialized and started by our main program, and the program terminated after the nondaemon process exited without waiting for the daemon process to finish.
+
+The ability to terminate the main program without having to wait for specific tasks that the daemon is processing is indeed extremely useful. However, sometimes we might want to wait for daemon processes for a specified amount of time before exiting; this way, if the specifications of the program allow some waiting time for the process' execution, we could complete some potential daemon processes instead of terminating all of them prematurely.
+
+The combination of daemon processes and the join() method from the multiprocessing module can help us implement this architecture, especially given that, while the join() method blocks the program execution indefinitely (or at least until the task finishes), it is also possible to pass a timeout argument to specify the number of seconds to wait for the process before exiting. Let's consider a modified version of the previous example. With the same f1() and f2() functions, in the following script, we are changing the way we handle the daemon process in the main program:
+
+```Python
+from multiprocessing import Process, current_process
+import time
+
+
+def f1():
+  p = current_process()
+  print("Starting process {0}, ID {1}".format(p.name, p.pid))
+  time.sleep(4)
+  print("Exiting process {0}, ID {1}".format(p.name, p.pid))
+
+
+def f2():
+  p = current_process()
+  print("Starting process {0}, ID {1}".format(p.name, p.pid))
+  time.sleep(2)
+  print("Exiting process {0}, ID {1}".format(p.name, p.pid))
+
+
+if __name__ == '__main__':
+  p1 = Process(name='Worker 1', target=f1)
+  p1.daemon = True
+  p2 = Process(name='Worker 2', target=f2)
+
+  p1.start()
+  time.sleep(1)
+  p2.start()
+
+  p1.join(1)
+  print("Whether worker 1 is still alive: {0}".format(p1.is_alive()))
+  p2.join()
+```
+
+Instead of terminating without waiting for the daemon process, in this example, we are calling the join() method on both processes: we allow one second for p1 to finish while we block the main program until p2 finishes. If p1 has not finished executing after that one second, the main program simply continues executing the rest of the program and exits, at which time we will see that p1—or Worker 1—is still alive. After running the Python script, your output should be similar to the following:
+
+```bash
+Starting process Worker 1, ID 18232
+Starting process Worker 2, ID 27296
+Whether worker 1 is still alive: True
+Exiting process Worker 2, ID 27296
+```
+
+We see that p1 was indeed still alive by the time the program moved on after waiting for it for one second.
+
+## Terminating processes
+
+The terminate() method from the multiprocessing.Process class offers a way to quickly terminate a process. When the method is called, exit handlers, finally causes, or similar resources that are specified in the Process class or an overridden class will not be executed. However, descendant processes of the terminated process will not be terminated. These processes are known as orphaned processes.
+
+Although terminating processes is sometimes frowned upon, it is sometimes necessary because some processes interact with interprocess-communication resources, such as locks, semaphores, pipes, or queues, and forcibly stopping those processes is likely to cause those resources to become corrupted or unavailable to other processes. If, however, the processes in your program never interact with the aforementioned resources, the terminate() method is considerably useful, especially if a process appears to be unresponsive or deadlocked.
+
+One thing to note when using the terminate() method is that, even though the Process object is effectively killed after calling the method, it is important that you call join() on the object as well. Since the alive status of Process objects is sometimes not immediately updated after the terminate() method, this practice gives the background system an opportunity to implement the update itself to reflect the termination of the processes.
+
+## Interprocess communication
+
+While locks are one of the most common synchronization primitives that are used for communication among threads, pipes and queues are the main way of communicating between different processes. Specifically, they provide message-passing options to facilitate communication between processes—pipes for connections between two processes and queues for multiple producers and consumers.
+
+Using a message queue for interprocess communication is preferred over having shared resources since, if certain processes mishandle and corrupt shared memory and resources while those resources are being shared, then there will be numerous undesirable and unpredictable consequences. If, however, a process failed to handle its message correctly, other items in the queue will remain intact. The following diagram represents the differences in architecture between using a message queue and shared resources (specifically memory) for interprocess communication:
+
+![Queue](ScreenshotsForNotes/Chapter6/Queue.PNG)

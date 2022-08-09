@@ -1248,3 +1248,357 @@ Husband is waiting for their partner to eat first...
 ...
 ```
 
+# 13. Starvation
+
+## The concept of starvation
+
+Starvation is a problem in concurrent systems, in which a process (or a thread) cannot gain access to the necessary resources in order to proceed with its execution and, therefore, cannot make any progress.
+
+## What is starvation ?
+
+It is quite common for a concurrent program to implement some sort of ordering between the different processes in its execution. For example, consider a program that has three separate processes, as follows:
+
+* One is responsible for handling extremely pressing instructions that need to be run as soon as the necessary resources become available
+
+* Another process is responsible for other important executions, which are not as essential as the tasks in the first process
+
+* The last one handles miscellaneous, very infrequent tasks
+
+Furthermore, these three process need to utilize the same resources in order to execute their respective instructions.
+
+Intuitively, we have every reason to implement a specification that allows the first process to have the highest priority of execution and access to resources, then the second process, and then the last process, with the lowest priority. However, imagine situations in which the first two processes (with higher priorities) run so often that the third process cannot execute its instructions; anytime the third process needs to run, it checks to see whether the resources are available to be used and finds out that one of the other, higher-priority processes is using them.
+
+This is a situation of starvation: the third process is given no opportunity to execute and, therefore, no progress can be made with that process. In a typical concurrent program, it is quite common to have more than three processes at different priority levels, yet the situation is fundamentally similar: some processes are given more opportunities to run and, therefore, they are constantly executing. Others have lower priorities and cannot access the necessary resources to execute.
+
+## Scheduling
+
+In the next few subsections, we will be discussing the potential candidates that cause starvation situations. Most of the time, a poorly coordinated set of scheduling instructions is the main cause of starvation. For example, a considerably naive algorithm that deals with three separate tasks might implement constant communication and interaction between the first two tasks.
+
+This setup leads to the fact that the execution flow of the algorithm switches solely between the first and second tasks, while the third finds itself idle and unable to make any progress with its execution; in this case, because it is starved of CPU execution flow. Intuitively, we can identify the root of the problem as the fact that the algorithm allows the first two tasks to always dominate the CPU, and hence, effectively prevents any other task to also utilize the CPU. A characteristic of a good scheduling algorithm is the ability to distribute the execution flow and allocate the resources equally and appropriately.
+
+As mentioned previously, many concurrent systems and programs implement a specific order of priority, in terms of process and thread execution. This implementation of ordered scheduling may very likely lead to the starvation of processes and threads of lower priorities and can result in a condition called priority inversion.
+
+Suppose that, in your concurrent program, you have process A of the highest priority, process B of a medium priority, and finally, process C of the lowest priority; process C would most likely be put in the situation of starvation. Additionally, if the execution of process A, the prioritized process, is dependent on the completion of process C, which is already in starvation, then process A might never be able to complete its execution, either, even though it is given the highest priority in the concurrent program.
+
+The following diagram further illustrates the concept of priority inversion: a high-priority task running from the time t2 to t3 needs to access some resources, which are being utilized by a low-priority task:
+
+![Priority Inversion](ScreenshotsForNotes/Chapter13/PriorityInversion.PNG)
+
+To reiterate, combining starvation and priority inversion can lead to a situation where even the high-priority tasks are unable to execute their instructions.
+
+## Causes of starvation
+
+With the complexity of designing a scheduling algorithm in mind, let us discuss the specific causes of starvation. The situations that we described in the preceding section indicate some potential causes of the situation of starvation. However, starvation can arise from a number of sources, as follows:
+
+* Processes (or threads) with high priorities dominate the execution flow in the CPU, and hence, low-priority processes (or threads) are not given the opportunity to execute their own instructions.
+
+* Processes (or threads) with high priorities dominate the usage of non-shareable resources, and hence, low-priority processes (or threads) are not given the opportunity to execute their own instructions. This situation is similar to the first one, but addresses the priority of accessing resources, instead of the priority of the execution itself.
+
+* Processes (or threads) with low priorities are waiting for resources to execute their instructions, but, as soon as the resources become available, other processes (or threads) with higher priorities are immediately given access to them, so the low-priority processes (or threads) wait infinitely.
+
+There are other causes of starvation, as well, but the preceding are the most common root causes.
+
+## Starvation's relationship to deadlock
+
+Interestingly, deadlock situations can also lead to starvation, as the definition of starvation states that if there is a process (or a thread) that is unable to make any progress because it cannot gain access to the necessary process, the process (or thread) is experiencing starvation.
+
+Recall our example of deadlock, the Dining Philosophers problem, illustrated as follows:
+
+![Dining Philosophers](ScreenshotsForNotes/Chapter13/DiningPhilosophers.PNG)
+
+When deadlock occurs for this situation, no philosopher can obtain the necessary resources to execute their instructions (each philosopher is required to have two forks to start eating). Each philosopher that is in a deadlock is therefore also in a state of starvation.
+
+## The readers-writers problem
+
+The readers-writers problem is one of the classic and most complex examples in the field of computer science, illustrating problems that might occur in a concurrent program. Throughout the analysis of the different variations of the readers-writers problem, we will reveal more about starvation, as well as its common causes. We will also simulate the problem in Python, so that a deeper understanding of the problem can be gained.
+
+### statement
+
+In a readers-writers problem, first and foremost, we have a shared resource, which, in most cases, is a text file. Different threads interact with that text file; each is either a reader or a writer. A reader is a thread that simply accesses the shared resource (the text file) and reads in the data included in that file, while a writer is a thread that accesses, and possibly mutates, the contents of the text file.
+
+We know that writers and readers cannot access the shared resources simultaneously since if a thread is writing data to the file, no other thread should be accessing the file to read any data from it. The goal of the readers-writers problem is therefore to find a correct and efficient way to design and coordinate the scheduling of these reader and writer thread. A successful implementation of that goal is not only that the program as a whole executes in the most optimized way, but also that all threads are given sufficient opportunity to execute their instructions and no starvation can occur. Additionally, the shared resource (the text file) needs to be handled appropriately, so that no data will be corrupted.
+
+The following diagram further illustrates the setup of the readers-writers problem:
+
+![Readers-Writers problem](ScreenshotsForNotes/Chapter13/ReadersWritersProblem.PNG)
+
+## The first readers-writers problem
+
+As we mentioned, the problem asks us to come up with a scheduling algorithm, so that readers and writers can access the text file appropriately and efficiently, without mishandling/corrupting the data that is included. A naive solution to this problem is to impose a lock on the text file, so that it becomes a non-shareable resource; this means that only one thread (either a reader or a writer) can access (and potentially manipulate) the text file at any given time.
+
+Yet, this approach simply equates to a sequential program: if the shared resource can be utilized by only one thread at a given time, none of the processing time between different threads can be overlapped, and effectively, the execution becomes sequential. Therefore, this is not an optimal solution, as it is taking advantage of concurrent programming.
+
+One insight regarding the reader threads can lead to a more optimal solution to this problem: since readers simply read in the text file and do not alter the data in it, multiple readers can be allowed to access the text file simultaneously. Indeed, even if more than one reader is fetching data from the text file at the same time, the data is not being changed in any way, and the consistency and accuracy of the data is therefore maintained.
+
+Following this approach, we will implement a specification in which no reader will be kept waiting if the shared resource is being opened for reading by another reader. Specifically, in addition to a lock on the shared resource, we will also have a counter for the number of readers currently accessing the resource. If, at any point in the program, that counter goes from zero to one (in other words, at least one reader is starting to access the resource), we will lock the resource from the writers; similarly, whenever the counter decreases to zero (in other words, no reader is asking for access to the resource), we will release the lock on the resource, so that writers can access it.
+
+This specification is efficient for the readers, in the sense that, once the first reader has accessed the resource and placed a lock on it, no writers can access it, and the subsequent readers will not have to re-lock it until the last reader finishes reading the resource.
+
+```Python
+import threading
+
+
+def writer():
+  global text
+
+  while True:
+    with resource:
+      print("Writing being done by {0}".format(threading.current_thread().name))
+      text += "Writing was done by {0}".format(threading.current_thread().name)
+
+
+def reader():
+  global rcount
+
+  while True:
+    with rcounter:
+      rcount += 1
+      if rcount == 1:
+        resource.acquire()
+        print("Reading being done by {0}".format(threading.current_thread().name))
+        print(text)
+
+      with rcounter:
+        rcount -= 1
+        if rcount == 0:
+          resource.release()
+```
+
+In the preceding script, the writer() function, which is to be called by a threading.Thread instance (in other words, a separate thread), specifies the logic of the writer threads that we discussed previously: accessing the shared resource (in this case, the global variable, text, which is simply a Python string) and writing some data to the resource. Note that we are putting all of its instructions inside a while loop, to simulate the constant nature of the application (writers and readers constantly try to access the shared resource).
+
+We can also see the reader logic in the reader() function. Before asking for access to the shared resource, each reader will increment a counter for the number of readers that are currently active and trying to access the resource. Similarly, after reading data off the file, each reader needs to decrement the number of readers. During this process, if a reader is the first reader to access the file (in other words, when the counter is one), it will put a lock on the file, so that no writers can access it; conversely, when a reader is the last reader to read the file, it has to release that lock.
+
+One note about the handling of that counter of readers: you might have noticed that we are using a lock object named rcounter when incrementing/decrementing the counter variable (rcount). This is a method that is used to avoid a race condition, which is another common concurrency-related problem, for the counter variable; specifically, without the lock, multiple threads can be accessing and altering the counter variable at the same time, but the only way to ensure the integrity of the data is for this counter variable to be handled sequentially. We will discuss race conditions (and the practice that is used to avoid them) in more detail in the next chapter.
+
+Going back to our current script, in the main program, we will set up the text variable, the counter for readers, and two lock objects (for the reader counter and the shared resource, respectively). We are also initializing and starting three reader threads and two writer threads, as follows:
+
+```Python
+text = 'This is some text.'
+rcount = 0
+rcounter = threading.Lock()
+resource = threading.Lock()
+
+threads = [threading.Thread(target=reader) for _ in range(3)] + [threading.Thread(target=writer) for _ in range(2)]
+
+for thread in threads:
+  thread.start()
+```
+
+It is important to note that, since the instructions of the reader and writer threads are both wrapped in while loops, the script, when started, will run infinitely. You should cancel the Python execution after around 3-4 seconds, when enough output has been produced so that the general behavior of the program can be observed.
+
+The following code shows the first few lines of output that I obtained after running the script:
+
+```bash
+Reading being done by Thread-1:
+This is some text.
+Reading being done by Thread-2:
+Reading being done by Thread-1:
+This is some text.
+This is some text.
+Reading being done by Thread-2:
+Reading being done by Thread-1:
+This is some text.
+This is some text.
+Reading being done by Thread-3:
+Reading being done by Thread-1:
+This is some text.
+This is some text.
+...
+```
+
+As you can see, there is a specific pattern in the preceding output: all of the threads that were accessing the shared resource were readers. In fact, throughout my entire output, no writer was able to access the file, and therefore, the text variable only contains the initial string, This is some text., and was not altered in any way. The output that you obtain should also have the same pattern (the shared resource not being altered).
+
+In this case, the writers are experiencing starvation, as none of them are able to access and use the resource. This is a direct result of our scheduling algorithm; since multiple readers are allowed to access the text file simultaneously, if there are multiple readers accessing the text file frequently enough, it will create a continuous stream of readers going through the text file, giving no room for a writer to attempt to access the file.
+
+This scheduling algorithm inadvertently gives priority to the readers over the writers, and is therefore called readers-preference. So, this design is undesirable.
+
+## The second readers-writers problem
+
+The problem with the first approach is that, when a reader is accessing the text file and a writer is waiting for the file to be unlocked, if another reader starts its execution and wants to access the file, it will be given priority over the writer that has already been waiting. Additionally, if more and more readers keep requesting access to the file, the writer will be waiting infinitely, and that was what we observed in our first code example.
+
+To address this problem, we will implement the specification that, once a writer makes a request to access the file, no reader should be able to jump in line and access the file before that writer. To do this, we will have an additional lock object in our program, to specify whether a writer is waiting for the file, and consequently, whether a reader thread can attempt to read the file; we will call this lock read_try.
+
+Similar to how the first of the readers accessing the text file always locks it from the writers, we will now have the first writer of the multiple that are waiting to access the file lock read_try, so that no reader can, again, jump in line before those writers that requested access before it. As we discussed in reference to the readers, since we are keeping track of the number of writers waiting for the text file, we will need to implement a counter for the number of writers, and its corresponding lock, in our program.
+
+```Python
+import threading
+
+
+def writer():
+  global text
+  global wcount
+
+  while True:
+    with wcounter:
+      wcount += 1
+      if wcount == 1:
+        read_try.acquire()
+
+    with resource:
+      print("Writing being done by {0}".format(threading.current_thread().name))
+      text += "Writing was done by {0}".format(threading.current_thread().name)
+
+    with wcounter:
+      wcount -= 1
+      if wcount == 0:
+        read_try.release()
+
+
+def reader():
+  global rcount
+
+  while True:
+    with read_try:
+      with rcounter:
+        rcount += 1
+        if rcount == 1:
+          resource.acquire()
+
+      print("Reading being done by {0}".format(threading.current_thread().name))
+      print(text)
+
+      with rcounter:
+        rcount -= 1
+        if rcount == 0:
+          resource.release()
+
+
+text = "This is some text."
+wcount = 0
+rcount = 0
+
+wcount = threading.Lock()
+rcounter = threading.Lock()
+resource = threading.Lock()
+read_try = threading.Lock()
+
+threads = [threading.Thread(target=reader) for _ in range(3)] + [threading.Thread(target=writer) for _ in range(2)]
+
+for thread in threads:
+  thread.start()
+```
+
+Compared to our first solution to the problem, the main program remains relatively the same (except for the initialization of the read_try lock, the wcount counter, and its lock, wcounter), but in our writer() function, we are locking read_try as soon as there is at least one writer waiting to access the file; when the last writer finishes its execution, it will release the lock, so that any reader waiting for the file can now access it.
+
+Again, to see the output produced by the program, we will have it run for 3-4 seconds, and then cancel the execution, as the program would otherwise run forever. The following is the output that I obtained via this script:
+
+```bash
+Reading being done by Thread-1:
+This is some text.
+Reading being done by Thread-1:
+This is some text.
+Writing being done by Thread-4.
+Writing being done by Thread-5.
+Writing being done by Thread-4.
+Writing being done by Thread-4.
+Writing being done by Thread-4.
+Writing being done by Thread-5.
+Writing being done by Thread-4.
+...
+```
+
+It can be observed that, while some readers were able to access the text file (indicated by the first four lines of my output), once a writer gained access to the shared resource, no reader was able to access it anymore. The rest of my output included messages about writing instructions: Writing being done by, and so on. As opposed to what we saw in the first solution of the readers-writers problem, this solution is giving priority to writers, and, as a consequence, the readers are starved. This is therefore called writers-preference.
+
+The priority that writers were given over readers resulted from the fact that, while only the first and the last writers have to acquire and release the read_try lock, respectively, each and every reader wanting to access the text file have to interact with that lock object individually. Once read_try is locked by a writer, no reader can even attempt to execute its instructions, let alone try to access the text file.
+
+There are cases in which some readers are able to gain access to the text file, if the readers are initialized and executed before the writers (for example, in our program, the readers were the first three elements, and the writers were the last two, in our list of threads). However, once a writer is able to access the file and acquire the read_try lock during its execution, starvation will most likely occur for the readers.
+
+This solution is also not desirable, as it gives higher priority to the writer threads in our program.
+
+## The third readers-writers problem
+
+You have seen that both of the solutions that we tried to implement can result in starvation, by not giving equal priorities to the separate threads; one can starve the writers, and the other can starve the readers. A balance between these two approaches might give us an implementation with equal priorities among the readers and writers, and hence, solve the problem of starvation.
+
+Recall this: in our second approach, we are placing a lock on a reader's attempt to access the text file, requiring that no writer will be starved once it starts waiting for the file. In this solution, we will implement a lock that also utilizes this logic, but is then applied to both readers and writers. All of the threads will then be subjected to the constraints of the lock, and equal priority will hence be achieved among the separate threads.
+
+Specifically, this is a lock that specifies whether a thread will be given access to the text file at a given moment; we will call this the service lock. Each writer or reader has to try to acquire this service lock before executing any of its instructions. A writer, having obtained this service lock, will also attempt to obtain the resource lock and release the service lock immediately thereafter. The writer will then execute its writing logic and finally release the resource lock at the end of its execution.
+
+```Python
+def writer():
+  global text
+
+  while True:
+    with service:
+      resource.require()
+
+    print("Writing being done by {0}".format(threading.current_thread().name))
+    text += "Writing being done by {0}".format(threading.current_thread().name)
+
+    resource.release()
+```
+
+A reader, on the other hand, will also need to acquire the service lock first. Since we are still allowing multiple readers to access the resource at the same time, we are implementing the reader counter and its corresponding lock.
+
+The reader will acquire the service lock and the counter lock, increment the reader counter (and potentially, lock the resource), and then release the service lock and counter lock, sequentially. Now, it will actually read data off the text file, and finally, it will decrement the reader counter, and will potentially release the resource lock, if it is the last reader to access the file at that time.
+
+The reader() function contains this specification, as follows:
+
+```Python
+def reader():
+  global rcount
+
+  while True:
+    with service:
+      rcounter.acquire()
+      rcount += 1
+
+      if rcount == 1:
+        resource.acquire()
+
+    rcounter.release()
+
+    print("Reading being done by {0}".format(threading.current_thread().name))
+    print(text)
+
+    with rcounter:
+      rcount -= 1
+      if rcount == 0:
+        resource.release()
+```
+
+Finally, in our main program, we initialize the text string, the reader counter, all of the necessary locks, and the reader and writer threads, as follows:
+
+```Python 
+text = "This is some text."
+rcount = 0
+
+rcounter = threading.Lock()
+resource = threading.Lock()
+service = threading.Lock()
+
+threads = [threading.Thread(target=reader) for _ in range(3)] + [threading.Thread(target=writer) for _ in range(2)]
+
+for thread in threads:
+    thread.start()
+```
+
+Note that, we are commenting the code that prints out the current content of the text file in the reader() function for readability for our output later on. Run the program for 3-4 seconds, and then cancel it. The following output is what I obtained on my personal computer:
+
+```bash
+Reading being done by Thread-3:
+Writing being done by Thread-4.
+Reading being done by Thread-1:
+Writing being done by Thread-5.
+Reading being done by Thread-2:
+Reading being done by Thread-3:
+Writing being done by Thread-4.
+...
+``` 
+
+The pattern that we have with this current output is that the readers and writers are able to access the shared resource cooperatively and efficiently; all of the readers and writers are executing their instructions, and no thread is being starved by this scheduling algorithm.
+
+Note that as you work with a reader-writer problem in your concurrent program, you do not have to reinvent the wheel regarding the approaches that we just discussed. PyPI actually has an external library called readerwriterlock that contains the implementation of the three approaches in Python, as well as supports for timeouts.
+
+## Solutions to starvation
+
+Through an analysis of different approaches to the readers-writers problem, you have seen the key to solving starvation: since some threads will be starved if they are not given a high priority in accessing the shared resources, implementing fairness in the execution of all of the threads will prevent starvation from occurring. Fairness, in this case, does not require a program to forgo any order or priority that it has imposed on the different threads; but to implement fairness, a program needs to ensure that all threads are given sufficient opportunities to execute their instructions.
+
+Keeping this idea in mind, we can potentially address the problem of starvation by implementing one (or a combination) of the following approaches:
+
+* Increasing the priority of low-priority threads: As we did with the writer threads in the second approach and the reader threads in the third approach to the readers-writers problem, prioritizing the threads that would otherwise not have any opportunity to access the shared resource can successfully eliminate starvation.
+
+* First-in-first-out thread queue: To ensure that a thread that started waiting for the shared resource before another thread will be able to acquire the resource before the other thread, we can keep track of the threads requesting access in a first-in-first-out queue.
+
+* Other methods: Several methods can also be implemented to balance the selection frequency of different threads. For example, a priority queue that also gives gradually increasing priority to threads that have been waiting in the queue for a long time, or if a thread has been able to access the shared resource for many times, it will be given less priority, and so on.
+
+Solving starvation in your concurrent program can be a rather complex and involved process, and a deep understanding of its scheduling algorithm, combined with an understanding of how processes and threads interact with the shared resources, is necessary during the process. As you saw in the example of the readers-writers problem, it can also take several implementations and revisions of different approaches to arrive at a good solution to starvation

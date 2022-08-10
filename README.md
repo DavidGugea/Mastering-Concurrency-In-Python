@@ -1602,3 +1602,316 @@ Keeping this idea in mind, we can potentially address the problem of starvation 
 * Other methods: Several methods can also be implemented to balance the selection frequency of different threads. For example, a priority queue that also gives gradually increasing priority to threads that have been waiting in the queue for a long time, or if a thread has been able to access the shared resource for many times, it will be given less priority, and so on.
 
 Solving starvation in your concurrent program can be a rather complex and involved process, and a deep understanding of its scheduling algorithm, combined with an understanding of how processes and threads interact with the shared resources, is necessary during the process. As you saw in the example of the readers-writers problem, it can also take several implementations and revisions of different approaches to arrive at a good solution to starvation
+
+# 14. Race Conditions
+
+## The concept of race conditions
+
+A race condition is typically defined as a phenomenon during which the output of a system is indeterminate and dependent on the scheduling algorithm and the order in which tasks are scheduled and executed. When the data becomes mishandled and corrupted during this process, a race condition becomes a bug in the system. Given the nature of this problem, it is quite common for a race condition to occur in concurrent systems, which emphasize scheduling and coordinating independent tasks.
+
+A race condition can occur in both an electronic hardware system and a software application; in this chapter, we will only be discussing race conditions in the context of software development—specifically, concurrent software applications. This section will cover the theoretical foundations of race conditions and their root causes and the concept of critical sections.
+
+## Critical sections
+
+Critical sections indicate shared resources that are accessed by multiple processes or threads in a concurrent application, which can lead to unexpected, and even erroneous, behavior. We have seen that there are multiple methods to protect the integrity of the data contained in these resources, and we call these protected sections critical sections.
+
+As you can imagine, the data in these critical sections, when interacted with and altered concurrently or in parallel, can become mishandled or corrupted. This is especially true when the threads and processes interacting with it are poorly coordinated and scheduled. The logical conclusion, therefore, is to not allow multiple agents to go into a critical section at the same time. We call this concept mutual exclusion.
+
+## How race conditions occur
+
+Let's consider a simple concurrent program, in order to understand what can give rise to a race condition. Suppose that the program has a shared resource and two separate threads (thread 1 and thread 2) that will access and interact with that resource. Specifically, the shared resource is a number and, as per their respective execution instructions, each thread is to read in that number, increment it by 1, and finally, update the value of the shared resource with the incremented number.
+
+Suppose that the shared number is originally 2, and then, thread 1 accesses and interacts with the number; the shared resource then becomes 3. After thread 1 successfully alters and exits the resource, thread 2 begins to execute its instructions, and the shared resource that is a number is updated to 4. Throughout this process, the number was originally 2, was incremented twice (each time by a separate thread), and held a value of 4 at the end. The shared number was not mishandled and corrupted in this case.
+
+Imagine, then, a scenario in which the shared number is still 2 at the beginning, yet both of the threads access the number at the same time. Now, each of the threads reads in the number 2 from the shared resource, each increments the number 2 to 3 individually, and then, each writes the number 3 back to the shared resource. Even though the shared resource was accessed and interacted with by a thread twice, it only held a value of 3 at the end of the process.
+
+This is an example of a race condition occurring in a concurrent program: since the second thread to access a shared resource does it before the first thread finishes its execution (in other words, writing the new value to the shared resource), the second thread fails to take in the updated resource value. This leads to the fact that, when the second thread writes to the resource, the value that is processed and updated by the first thread is overwritten. At the end of the execution of the two threads, the shared resource has technically only been updated by the second thread.
+
+The following diagram further illustrates the contrast between a correct data handling process and a situation with a race condition:
+
+![Mishandling shared data](ScreenshotsForNotes/Chapter14/MishandlingSharedData.PNG)
+
+Intuitively, we can see that a race condition can result in the mishandling and corruption of data. In the preceding example, we can see that a race condition can occur with only two separate threads accessing a common resource, causing the shared resource to be updated incorrectly and hold an incorrect value at the end of the program. We know that most reallife concurrent applications contain significantly more threads and processes and more shared resources, and the more threads/processes that interact with the shared resource, the more likely it is that a race condition will occur.
+
+## Simulating race conditions in Python
+
+Before we discuss a solution that we can implement to solve the problem of race conditions, let's try to simulate the problem in Python.
+
+```Python
+import random
+import time
+import threading
+
+
+def update():
+    global counter
+
+    current_counter = counter
+    time.sleep(random.randint(0, 1))
+    counter = current_counter + 1
+```
+
+The goal of the preceding update() function is to increment a global variable called counter, and it is to be called by a separate thread in our script. Inside the function, we are interacting with a shared resource—in this case, counter. We then assign the value of counter to another local variable, called current_counter (this is to simulate the process of reading data from more complex data structures for the shared resources).
+
+Next, we will pause the execution of the function by using the time.sleep() method. The length of the period during which the program will pause is pseudo-randomly chosen between 0 and 1, generated by the function call, random.randint(0, 1), so the program will either pause for one second or not at all. Finally, we assign the newly computed value of current_counter (which is its one-increment) to the original shared resource (the counter variable).
+
+Now, we can move on to our main program:
+
+```Python
+counter = 0
+threads = [threading.Thread(target=update) for _ in range(20)]
+
+for thread in threads:
+  thread.start()
+
+for thread in threads:
+  thread.join()
+
+print("Final counter: {0}".format(counter))
+print("Finished.")
+```
+
+Here, we are initializing the counter global variable with a set of threading.Thread objects, in order to execute the update() function concurrently; we are initializing twenty thread objects, to increment our shared counter twenty times. After starting and joining all of the threads that we have, we can finally print out the end value of our shared counter variable.
+
+Theoretically, a well-designed concurrent program will successfully increment the share counter twenty times in total, and, since its original value is 0, the end value of the counter should be 20 at the end of the program. However, as you run this script, the counter variable that you obtain will most likely not hold an end value of 20. The following is my own output, obtained from running the script:
+
+```bash
+Final counter: 9.
+Finished.
+```
+
+This output indicates that the counter was only successfully incremented nine times. This is a direct result of a race condition that our concurrent program has. This race condition occurs when a specific thread spends time reading in and processing the data from the shared resource (specifically, for one second, using the time.sleep() method), and another thread reads in the current value of the counter variable, which, at this point, has not been updated by the first thread, since it has not completed its execution.
+
+Interestingly, if a thread does not spend anytime processing the data (in other words, when 0 is chosen by the pseudo-random random.randint() method), the value of the shared resource can potentially be updated just in time for the next thread to read and process it. This phenomenon is illustrated by the fact that the end value of the counter varies within different runs of the program. For example, the following is the output that I obtained after running the script three times. The output from the first run is as follows:
+
+```bash
+Final counter: 9.
+Finished.
+```
+
+The output from the second run is as follows:
+
+```bash
+Final counter: 12.
+Finished.
+```
+
+The output from the third run is as follows:
+
+```bash
+Final counter: 5.
+Finished.
+```
+
+Again, the final value of the counter is dependent on the number of threads that spend one second pausing and the number of threads not pausing at all. Since these two numbers are, in turn, dependent on the random.randint() method, the final value of the counter changes between different runs of the program. We will still have a race condition in our program, except for when we can ensure that the final value of the counter is always 20 (the counter being successfully incremented twenty times, in total).
+
+## Locks as a solution to race conditions
+
+In this section, we will discuss the most common solution to race conditions: locks. Intuitively, since the race conditions that we observed arose when multiple threads or processes accessed and wrote to a shared resource simultaneously, the key idea to solving race conditions is to isolate the executions of different threads/processes, especially when interacting with a shared resource. Specifically, we need to make sure that a thread/process can only access the shared resource after any other threads/processes interacting with the resource have finished their interactions with that resource.
+
+## The effectiveness of locks
+
+With locks, we can turn a shared resource in a concurrent program into a critical section, whose integrity of data is guaranteed to be protected. A critical section guarantees the mutual exclusion of a shared resource, and cannot be accessed concurrently by multiple processes or threads; this will prevent any protected data from being updated or altered with conflicting information, resulting from race conditions.
+
+In the following diagram, Thread B is blocked from accessing the shared resource—the critical section, named var—by a mutex (mutual exclusion) lock, because Thread A is already accessing the resource:
+
+![Locks and critical sections](ScreenshotsForNotes/Chapter14/LocksCriticalSection.PNG)
+
+Now, we will specify that, in order to gain access to a critical section in a concurrent program, a thread or process needs to acquire a lock object that is associated with the critical section; similarly, that thread or process also needs to release that lock upon leaving the critical section. This setup will effectively prevent multiple accesses to the critical section, and will therefore prevent race conditions. The following diagram illustrates the execution flow of multiple threads interacting with multiple critical sections, with the implementation of locks in place:
+
+![Locks and critical sections multiple threads](ScreenshotsForNotes/Chapter14/LCSMT.PNG)
+
+As you can see in the diagram, threads T1 and T2 both interact with three critical sections in their respective execution instructions: CS1, CS2, and CS3. Here, T1 and T2 attempt to access CS1 at almost the same time, and, since CS1 is protected with lock L1, only T1 is able to acquire lock L1, and hence, access/interact with the critical section, while T2 has to spend time waiting for T1 to exit out of the critical section and release the lock before accessing the section itself. Similarly, for the critical sections, CS2 and CS3, although both threads require access to a critical section at the same time, only one can process it, while the other has to wait to acquire the lock associated with the critical section.
+
+## Implementation in Python
+
+Now, let's implement the specification in the preceding example, in order to solve the problem of race conditions.
+
+```Python
+import random
+import time
+import threading
+
+
+def update():
+  global counter
+
+  with count_lock:
+    current_counter = counter
+    time.sleep(random.randint(0, 1))
+    counter = current_counter + 1
+```
+
+You can see that all of the execution instructions of a thread specified in the update() function are under the context manager of a lock object named count_lock. So, every time a thread is called to run the function, it will have to first acquire the lock object, before any instructions can be executed. In our main program, we simply create the lock object in addition to what we already had, as follows:
+
+```Python
+counter = 0
+count_lock = threading.Lock()
+
+threads = [threading.Thread(target=update) for _ in range(20)]
+
+for thread in threads:
+  thread.start()
+for thread in threads:
+  thread.join()
+
+print("Final counter: {0}".format(counter))
+print("Finished.")
+```
+
+Run the program, and your output should look similar to the following:
+
+```bash
+Final counter: 20.
+Finished.
+```
+
+You can see that the counter was successfully incremented twenty times and held the correct value at the end of the program. Furthermore, no matter how many times the script is executed, the final value of the counter will always be 20. This is the advantage of using locks to implement critical sections in your concurrent programs.
+
+## The downside of locks
+
+In Chapter 12, Deadlock, we covered an interesting phenomenon, in which the use of locks can lead to undesirable results. Specifically, we found out that, with enough locks implemented in a concurrent program, the whole program can become sequential. Let's analyze this concept with our current program
+
+```Python
+import threading
+import random
+import time
+
+random.seed(0)
+
+
+def update(pause_period):
+  global counter
+
+  with count_lock:
+    current_counter = counter
+    time.sleep(pause_period)
+    counter = current_counter + 1
+
+
+pause_periods = [random.randint(0, 1) for _ in range(20)]
+
+counter = 0
+count_lock = threading.Lock()
+
+start = time.perf_counter()
+for i in range(20):
+  update(pause_periods[i])
+
+print("--Sequential version--")
+print("Final counter: {0}".format(counter))
+print("Took {0:.2f} seconds.".format(time.perf_counter() - start))
+
+counter = 0
+threads = [threading.Thread(target=update, args=(pause_periods[i],)) for i in range(20)]
+
+start = time.perf_counter()
+for thread in threads:
+  thread.start()
+for thread in threads:
+  thread.join()
+
+print("--Concurrent version--")
+print("Final counter: {0}".format(counter))
+print("Took {0:.2f} seconds.".format(time.perf_counter() - start))
+
+print("Finished.")
+```
+
+## Turning a concurrent program sequential
+
+The goal of this script is to compare the speed of our current concurrent program with its sequential version. Here, we are still using the same update() function, with locks, and we are running it twenty times, both sequentially and concurrently, like we did earlier. We are also creating a list of determined periods of pausing, so that these periods are consistent between when we simulate the sequential version and when we simulate the concurrent version (for this reason, the update() function now takes in a parameter that specifies the period of pausing each time it is called):
+
+```Python
+pause_periods = [random.randint(0, 1) for _ in range(20)]
+```
+
+During the next step of the program, we simply call the update() function inside a for loop, with twenty iterations, keeping track of the time it takes for the loop to finish. Note that, even though this is to simulate the sequential version of the program, the update() function still needs the lock object to be created prior, so we are initializing it here:
+
+```Python
+counter = 0
+count_lock = threading.Lock()
+
+start = time.perf_counter()
+for i in range(20):
+  update(pause_periods[i])
+
+print("--Sequential version--")
+print("Final counter: {0}".format(counter))
+print("Took {0:.2f} seconds.".format(time.perf_counter() - start))
+```
+
+The last step is to reset the counter and run the concurrent version of the program that we already implemented. Again, we need to pass in the corresponding pause period while initializing each of the threads that run the update() function. We are also keeping track of the time it takes for this concurrent version of the program to run:
+
+```Python
+counter = 0
+threads = [threading.Thread(target=update, args=(pause_periods[i],)) for i in range(20)]
+
+start = time.perf_counter()
+for thread in threads:
+  thread.start()
+for thread in threads:
+  thread.join()
+
+print("--Concurrent version--")
+print("Final counter: {0}".format(counter))
+print("Took {0:.2f} seconds.".format(time.perf_counter() - start))
+
+print("Finished.")
+```
+
+Now, after you have run the script, you will observe that both the sequential version and the concurrent version of our program took the same amount of time to run. Specifically, the following is the output that I obtained; in this case, they both took approximately 12 seconds. The actual time that your program takes might be different, but the speed of the two versions should still be equal:
+
+```bash
+--Sequential version--
+Final counter: 20.
+Took 12.03 seconds.
+--Concurrent version--
+Final counter: 20.
+Took 12.03 seconds.
+Finished.
+```
+
+So, our concurrent program is taking just as much time as its sequential version, which negates one of the biggest purposes of implementing concurrency in a program: improving speed. But why would concurrent and traditional sequential applications with the same sets of instructions and elements also have the same speed? Should the concurrent program always produce a faster speed than the sequential one?
+
+Recall that, in our program, the critical section is being protected by a lock object, and no multiple threads can access it at the same time. Since all of the execution of the program (incrementing the counter for twenty times) depends on a thread accessing the critical section, the placement of the lock object on the critical section means that only one thread can be executing at a given time. With this specification, the executions of any two threads cannot overlap with each other, and no additional speed can be gained from this implementation of concurrency.
+
+This is the phenomenon that we encountered when analyzing the problem of deadlock: if enough locks are placed in a concurrent program, that program will become entirely sequential. This is a reason why locks are sometimes undesirable solutions to problems in concurrent programming. However, this situation only happens if all of the execution of the concurrent program is dependent upon interacting with the critical section. Most of the time, reading and manipulating the data of a shared resource is only a portion of the entire program and, therefore, concurrency still provides the intended additional speed for our program.
+
+## Locks do not lock anything
+
+An additional aspect of locks is the fact that they do not actually lock anything. The only way that a lock object is utilized, with respect to a specific shared resource, is for the threads and processes interacting with that resource to also interact with the lock. In other words, if those threads and processes choose to not check with the lock before accessing and altering the shared resource, the lock object itself cannot stop them from doing so.
+
+In our examples, you have seen that, to implement the acquiring/releasing process of a lock object, the instructions of a thread or process will be wrapped around by a lock context manager; this specification is dependent on the implementation of the thread/process execution logic and not the resource. That is because the lock objects that we have seen are not connected to the resources that they are supposed to protect in any way. So, if the thread/process execution logic does not require any interaction with the lock object associated with the shared resource, that thread or process can simply gain access to the resource without difficulty, potentially resulting in the mismanipulation and corruption of data.
+
+This is not only true in the scope of having multiple threads and processes in a single concurrent program. Suppose that we have a concurrent system consisting of multiple components that all interact and manipulate the data of a resource shared across the system, and this resource is associated with a lock object; it follows that, if any of these components fail to interact with that lock, it can simply bypass the protection implemented by the lock and access the shared resource. More importantly, this characteristic of locks also has implications regarding the security of a concurrent program. If an outside, malicious agent is connected to the system (say, a malicious client interacting with a server) and intends to corrupt the data shared across the system, that agent can be instructed to simply ignore the lock object and access that data in an intrusive way.
+
+The view that locks don't lock anything was popularized by Raymond Hettinger, a Python core developer who worked on the implementation of various elements in Python concurrent programming. It is argued that using lock objects alone does not guarantee a secure implementation of concurrent data structures and systems. Locks need to be concretely linked to the resources that they are to protect, and nothing should be able to access a resource without first acquiring the lock that is associated with it. Alternatively, other concurrent synchronization tools, such as atomic message queues, can provide a solution to this problem.
+
+## Race conditions in real life
+
+You have now learned about the concept of race conditions, how they are caused in concurrent systems, and how to effectively prevent them. In this section, we will provide an overarching view of how race conditions can occur in real-life examples, within the various sub-fields of computer science. Specifically, we will be discussing the topics of security, file management, and networking.
+
+## Security
+
+Concurrent programming can have significant implications in terms of the security of the system in question. Recall that a race condition arises between the process of reading and altering the data of a resource; a race condition in an authenticating system can cause the corruption of data between the time of check (when the credentials of an agent are checked) and the time of use (when the agent can utilize the resource). This problem is also known as a Time-Of-Check-To-Time-Of-Use (TOCTTOU) bug, which is undoubtedly detrimental to security systems.
+
+Careless protection of shared resources when handling race conditions, as we briefly touched upon during the last section, can provide external agents with access to those supposedly protected resources. Those agents can then change the data of the resources to create privilege escalation (in simple terms, to give themselves more illegal access to more shared resources), or they can simply corrupt the data, causing the whole system to malfunction.
+
+Interestingly, race conditions can also be used to implement computer security. As race conditions result from the uncoordinated access of multiple threads/processes to a shared resources, the specification in which a race condition occurs is significantly random. For example, in our own Python example, you saw that, when simulating a race condition, the final value of the counter varies between different executions of the program; this is (partly) because of the unpredictable nature of the situation, in which multiple threads are running and accessing the shared resources. (I say partly, since the randomness also results from the random pausing periods that we generate in each execution of the program.) So, race conditions are sometimes intentionally provoked, and the information obtained when the race condition occurs can be used to generate digital fingerprints for security processes—this information, again, is significantly random, and is therefore valuable for security purposes.
+
+## Operating systems
+
+Race conditions can occur in the context of file and memory management in an operating system, when two separate programs attempt to access the same resource, such as memory space. Imagine a situation where two processes from different programs have been running for a significant amount of time, and, even though they were originally initialized apart from each other in terms of memory space, enough data has been accumulated and the stack of execution of one process now collides with that of the other process. This can lead to the two processes sharing the same portion of memory space and can ultimately result in unpredictable consequences.
+
+Another aspect of the complexity of race conditions is illustrated by the Unix version 7 operating system—specifically, in the mkdir command. Typically, the mkdir command is used to create a new directory in the Unix operating system; this is done by calling the mknod command to create the actual directory and the chown command to specify the owner of that directory. Because there are two separate commands to be run and a definite gap exists between when the first command is finished and the second is called, this can cause a race condition.
+
+During the gap between the two commands, if someone can delete the new directory created by the mknod command and link the reference to another file, when the chown command is run, the ownership of that file will be changed. By exploiting this vulnerability, someone can theoretically change the ownership of any file in an operating system so that someone can create a new directory. The following diagram further illustrates this exploitation:
+
+![mkdir Race Condition](ScreenshotsForNotes/Chapter14/mkdirRaceCondition.PNG)
+
+## Networking
+
+In networking, race conditions can take the form of giving multiple users unique privileges in a network. Specifically, say a given server should only have exactly one user with admin privileges. If two users, who are both eligible to become the server admin, request access to those privileges at the same time, then it is possible for both of them to gain that access. This is because, at the point when both of the user requests are received by the server, neither of the users have been granted admin privileges yet, and the server thinks that admin privileges can still be given out.
+
+This form of a race condition is quite common when a network is highly optimized for parallel processing (for example, non-blocking sockets), without a careful consideration of the resources shared across the network

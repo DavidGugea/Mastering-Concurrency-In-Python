@@ -2314,3 +2314,85 @@ Even though some operations in Python are innately atomic, it can be quite diffi
 # 18. Building a Server from Scratch
 
 \-
+
+# 19. Testing, Debugging, and Scheduling Concurrent Applications
+
+## Scheduling with APScheduler
+
+APScheduler (short for Advanced Python Scheduler) is an external Python library that supports the scheduling of Python code to be executed later, either once or periodically. This library gives us high-level options to dynamically add/remove jobs to/from the job list so they can be scheduled and executed, as well as to decide how to distribute those jobs to different threads and processes.
+
+Some might think of Celery as the go-to scheduling tool for Python. However, while Celery is a distributed task queue with basic scheduling capabilities, APScheduler is quite the opposite: a scheduler with basic task queuing options and advanced scheduling functionalities. Additionally, users of both tools have reported that APScheduler is easier to set up and implement.
+
+## Not a scheduling service
+
+As the term scheduler can be quite misleading to specific groups of developers, let's clarify the functionalities that APScheduler provides, as well as what it does not provide. First and foremost, the library can be used as a cross-platform scheduler that is also applicationspecific, as opposed to more common schedulers that are platform-specific, such as the cron daemon (for Linux systems) or the Windows task scheduler.
+
+It is important to note that APScheduler is not, in itself, a scheduling service that has a prebuilt GUI or command-line interface. It is still a Python library that has to be imported and utilized inside existing applications (that is why it is application-specific). However, as you will learn later on, APScheduler comes with numerous functionalities that can be leveraged to build an actual scheduling service.
+
+For example, the ability to schedule jobs (specifically, background ones) is essential for web applications nowadays, as they can include different but important functionalities, such as sending emails or backing up and synchronizing data. In that context, APScheduler is arguably the most common tool to schedule tasks for cloud applications that involve Python instructions, such as Heroku and PythonAnywhere.
+
+## APScheduler functionalities
+
+Let's explore some of the most common functionalities provided by the APScheduler library. Execution-wise, it offers three different scheduling mechanisms, so that one can choose the mechanism that is most suitable for one's applications (these mechanisms are also sometimes called event triggers):
+
+* Cron-style scheduling: This mechanism allows jobs to have prespecified start and end times
+
+* Interval-based execution: This mechanism runs jobs at even intervals (for example, every two minutes, every day), with optional start and end times
+
+* Delayed execution: This mechanism allows the application to wait for a specific period of time before executing items in the job list
+
+Furthermore, APScheduler allows us to store jobs to be executed in various backend systems, such as regular memory, MongoDB, Redis, RethinkDB, SPLAlchemy, or ZooKeeper. Whether it is a desktop program, a web application, or simply a Python script, APScheduler is most likely to be able to work with how scheduled jobs are stored.
+
+In addition to that, the library can also work seamlessly with common Python concurrency frameworks, such as AsyncIO, Gevent, Tornado, and Twisted. This means that the lowlevel code included in the APScheduler library contains instructions that can cohesively schedule and execute functions and programs implemented in these frameworks, making the library even more dynamic.
+
+Finally, APScheduler provides different options to actually execute the scheduled code, by specifying the appropriate executor(s). Specifically, one can simply execute jobs normally, in a blocking way or in the background. We also have the option to use a pool of threads or processes to distribute the work in a concurrent way. Later on, we will look at an example where we utilize a process pool to execute scheduled jobs.
+
+The following diagram maps out all of the major classes and functionalities included in APScheduler:
+
+![APScheduler](ScreenshotsForNotes/Chapter19/APScheduler.PNG)
+
+## APScheduler API
+
+In this section, we will look at how to actually integrate APScheduler into existing Python programs, by analyzing the different classes and methods provided by the library. We will also look at how jobs are distributed across different threads and processes, when we utilize a concurrent executor to run our scheduled jobs.
+
+## Scheduler classes
+
+First, let's look at the options available for our main scheduler, which is the most important component in the process of scheduling tasks to be executed at a later time:
+
+* BlockingScheduler: This class should be used when the scheduler is intended to be the only task running in the process. As the name suggests, an instance of this class will block any other instructions in the same process.
+
+* BackgroundScheduler: As opposed to BlockingScheduler, this class allows scheduled jobs to be executed in the background, inside an existing application.
+
+In addition, there are also scheduler classes to be used if your application utilizes specific concurrency frameworks: AsyncIOScheduler for the asyncio module; GeventScheduler for Gevent; TornadoScheduler for Tornado applications; TwistedScheduler for Twisted applications; and so on.
+
+## Executor classes
+
+Another important choice to be made during the process of scheduling jobs to be executed at a later time is: Which executor(s) should run the jobs? Generally, the default executor, ThreadPoolExecutor, which distributes the work across different threads in the same process, is recommended. However, as you have learned, if the scheduled jobs contain instructions that utilize CPU-intensive operations, then the workload should be distributed across multiple CPU cores, and ProcessPoolExecutor should be utilized.
+
+It is important to note that these two executor classes interact with the concurrent.futures module that we discussed in earlier chapters, in order to facilitate concurrent execution. The default number of maximum workers for both executor classes is 10, and can be changed upon initialization.
+
+## Trigger keywords
+
+The last decision in the process of building a scheduler is how scheduled jobs should be executed in the future; this is the event-trigger option we mentioned earlier. APScheduler provides three different triggering mechanisms; the following keywords should be passed as an argument to the scheduler initializer, in order to specify the event trigger type:
+
+* 'date': This keyword is used when the job is to be run once, at a specific point in the future.
+
+* 'interval': This is keyword is used when the job is to be run at fixed intervals of time. We will be using this keyword in our examples later on.
+
+* 'cron': This keyword is used when the job is to be periodically run at a certain time of day.
+
+Additionally, it is possible to mix and match multiple types of trigger. We also have the option to have scheduled jobs executed either when all registered triggers so specify, or when at least one of them does.
+
+## Common scheduler methods
+
+Finally, let's consider the methods that are commonly used when declaring a scheduler, in addition to the preceding classes and keywords. Specifically, the following methods are called by scheduler objects:
+
+* add_executor(): This method is called to register an executor to run jobs in the future. Specifically, we typically pass the string 'processpool' to this method to have the jobs be distributed across multiple processes. Otherwise, as mentioned, as thread pool will be used a the default executor. This method also returns an executor object that can be manipulated further.
+
+* remove_executor(): This method is used on an executor object, to remove it from a scheduler.
+
+* add_job(): This method can be used to add an additional job to the job list, to be executed later. The method first takes in a callable that is the new job in the job list, and various other arguments that are used to specify how the job should be scheduled and executed. Similar to add_executor(), this method can return a job object that can be manipulated outside the method. remove_job(): Similarly, this method can be used on a job object, to remove it from a scheduler.
+
+* start(): This method starts scheduled jobs along with implemented executors, and begins to process the job list.
+
+* shutdown(): This method stops the calling scheduler object, along with its job list and implemented executors. If it is called when there are current jobs running, those jobs will not be interrupted

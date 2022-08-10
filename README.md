@@ -1915,3 +1915,208 @@ During the gap between the two commands, if someone can delete the new directory
 In networking, race conditions can take the form of giving multiple users unique privileges in a network. Specifically, say a given server should only have exactly one user with admin privileges. If two users, who are both eligible to become the server admin, request access to those privileges at the same time, then it is possible for both of them to gain that access. This is because, at the point when both of the user requests are received by the server, neither of the users have been granted admin privileges yet, and the server thinks that admin privileges can still be given out.
 
 This form of a race condition is quite common when a network is highly optimized for parallel processing (for example, non-blocking sockets), without a careful consideration of the resources shared across the network
+
+# 15. The Global Interpreter Lock
+
+## An introduction to the Global Interpreter Lock
+
+The GIL is quite popular in the Python concurrent programming community. Designed as a lock that will only allow one thread to access and control the Python interpreter at any given time, the GIL in Python is often known as the infamous GIL that prevents multithreaded programs from reaching their fully optimized speed.
+
+## An analysis of memory management in Python
+
+Before we jump into the specifics of the GIL and its effects, let's consider the problems that Python core developers encountered during the early days of Python, and that gave rise to a need for the GIL. Specifically, there is a significant difference between Python programming and programming in other popular languages, in terms of managing objects in the memory space.
+
+For example, in the programming language C++, a variable is actually a location in the memory space where a value will be written. This setup leads to the fact that, when a nonpointer variable is assigned with a specific value, the programming language will effectively copy that specific value to the memory location (that is, the variable). Additionally, when a variable is assigned with another variable (which is not a pointer), the memory location of the latter will be copied to that of the former; no further connection between these two variables will be maintained after the assignment.
+
+On the other hand, Python considers a variable as simply a name, while the actual values of its variables are isolated in another region in the memory space. When a value is assigned to a variable, the variable is effectively given a reference to the location in the memory space of the value (even though the term referencing is not used in the same sense as C++ referencing). Memory management in Python is therefore fundamentally different from the model of putting a value into a memory space that we see in C++.
+
+This means that when an assignment instruction is executed, Python simply interacts with references and switches them around—not the actual values themselves. Also, for this reason, multiple variables can be referenced by the same value, and the changes made by one variable will be reflected throughout all of the other associated variables.
+
+```Python
+import sys
+
+print("Reference count when direct-referencing: {0}".format(sys.getrefcount([7])))
+
+a = [7]
+print("Reference count when reference once: {0}".format(sys.getrefcount(a)))
+
+b = a
+print("Reference count when reference twice: {0}".format(sys.getrefcount(a)))
+
+a[0] = 8
+print("Variable a after a is changed: {0}".format(a))
+print("Variable b after a is changed: {0}".format(b))
+
+print("Finished.")
+```
+
+In this example, we are looking at the management of the value [7] (a list of one element: the integer 7). We mentioned that values in Python are stored independently of variables, and value management in Python simply references variables to the appropriate values. The sys.getrefcount() method in Python takes in an object and returns the counter of all references that the value associated to that object has. Here, we are calling sys.getrefcount() three times: on the actual value, [7]; the variable a that is assigned with the value; and finally, the variable b that is assigned with the variable a.
+
+Additionally, we are exploring the process of mutating the value by using a variable referenced with it and the resulting values of all of the variables associated to that value. Specifically, we are mutating the first element of the list via variable a, and printing out the values of both a and b. Run the script, and your output should be similar to the following:
+
+```bash
+Reference count when direct-referencing: 1.
+Reference count when referenced once: 2.
+Reference count when referenced twice: 3.
+Variable a after a is changed: [8].
+Variable b after a is changed: [8].
+Finished.
+```
+
+As you can see, this output is consistent with what we discussed: for the first sys.getrefcount() function call, there is only one reference count for the value [7], which is created when we directly reference it; when we assign the list to variable a, the value has two references, since a is now associated with the value; finally, when a is assigned to b, [7] is additionally referenced by b, and the reference count is now three.
+
+In the output of the second part of the program, we can see that, when we changed the value of which variable a references, [7] was mutated instead of the variable a. As a result, variable b, which was referencing the same value as a, also had its value changed.
+
+The following diagram illustrates this process. In Python programs, variables (a and b) simply make references to the actual values (objects), and an assignment statement between two variables (for example, a = b) instructs Python to have the two variables reference the same object (as opposed to copying the actual value to another memory location, like in C++):
+
+![Python's referencing scheme](ScreenshotsForNotes/Chapter15/PythonsReferencingScheme.PNG)
+
+## The problem that the GIL addresses
+
+Keeping Python's implementation of memory and variable management in mind, we can see that references to a given value in Python are constantly changing in a program, and keeping track of the reference count for a value is therefore highly important.
+
+Now, applying what you learned in Chapter 14, Race Conditions, you should know that in a Python concurrent program, this reference count is a shared resource that needs protection from race conditions. In other words, this reference count is a critical section, which, if handled carelessly, will result in an incorrect interpretation of how many variables are referencing a particular value. This will cause memory leaks that will make Python programs significantly inefficient, and may even release a memory that is actually being referenced by some variables, losing that value forever.
+
+As you learned in the previous chapter, a solution to making sure that race conditions will not occur with regard to a particular shared resource is to place a lock on that resource, effectively allowing one thread, at the most, to access the resource at any given time within a concurrent program. We also discussed that, if enough locks are placed in a concurrent program, that program will become entirely sequential, and no additional speed will be gained by implementing concurrency.
+
+The GIL is a solution to the combination of the two preceding problems, being one single lock on the entire execution of Python. The GIL must first be acquired by any Python instruction that wants to be executed (CPU-bound tasks), preventing a race condition from occurring for any reference count.
+
+In the early days of the development of the Python language, other solutions to the problem described here were also proposed, but the GIL was the most efficient and simple to implement, by far. Since the GIL is a lightweight, overarching lock for the entire execution of Python, no other lock needs to be implemented to guarantee the integrity of other critical sections, keeping the performance overhead of Python programs at a minimum.
+
+## Problems raised by the GIL
+
+Intuitively, with a lock guarding all CPU-bound tasks in Python, a concurrent program will not be able to become fully multithreading. The GIL effectively prevents CPU-bound tasks from being executed in parallel across multiple threads. To understand the effect of this feature of the GIL, let's consider an example in Python:
+
+```Python
+import time
+import threading
+
+COUNT = 50000000
+
+
+def countdown(n):
+  while n > 0:
+    n -= 1
+
+
+start = time.perf_counter()
+countdown(COUNT)
+
+print("Sequential program finished.")
+print("Took {0:.2f} seconds.".format(time.perf_counter() - start))
+
+thread1 = threading.Thread(target=countdown, args=(COUNT // 2,))
+thread2 = threading.Thread(target=countdown, args=(COUNT // 2,))
+
+start = time.perf_counter()
+thread1.start()
+thread2.start()
+thread1.join()
+thread2.join()
+
+print("Concurrent program finished.")
+print("Took {0:.2f} seconds".format(time.perf_counter() - start))
+```
+
+In this example, we are comparing the speed of executing a particular program in Python sequentially and concurrently, via multithreading. Specifically, we have a function named countdown() that simulates a heavy CPU-bound task, which takes in a number, n, and decrements it until it becomes zero or negative. We then call countdown() on 50,000,000 once, as a sequential program. Finally, we call the function twice, each in a separate thread, on 25,000,000, which is exactly half of 50,000,000; this is the multithreading version of the program. We are also keeping track of the time it takes for Python to run both the sequential program and the multithreading program.
+
+Theoretically, the multithreading version of the program should take half as long as the sequential version, as the task is effectively being split in half and run in parallel, via the two threads that we created. However, the output produced by the program would suggest otherwise. The following output is what I obtained through running the script:
+
+```bash
+Sequential program finished.
+Took 2.80 seconds.
+Concurrent program finished.
+Took 2.74 seconds.
+```
+
+Contrary to what we predicted, the concurrent version of the countdown took almost as long as the sequential version; multithreading did not offer any considerable speedup for our program. This is a direct effect of having the GIL guarding CPU-bound tasks, as multiple threads are not allowed to run simultaneously. Sometimes, a multithreading program can take even longer to complete its execution than its sequential counterpart, since there is also the overhead of acquiring and releasing the GIL.
+
+This is undoubtedly a significant problem for multithreading, and for concurrent programming in Python in general, because as long as a program contains CPU-bound instructions, those instructions will, in fact, be sequential in the execution of the program. However, instructions that are not CPU-bound happen outside the GIL, and thus, they are not affected by the GIL (for example, I/O-bound instructions).
+
+## The potential removal of the GIL from Python
+
+You have learned that the GIL sets a significant constraint on our multithreading programs in Python, especially those with CPU-bound tasks. For this reason, many Python developers have come to view the GIL in a negative light, and the term "the infamous GIL" has started to become popular; it is not surprising that some have even advocated the complete removal of the GIL from the Python language.
+
+In fact, multiple attempts to remove the GIL have been made by prominent Python users. However, the GIL is so deeply implanted in the implementation of the language, and the execution of most libraries and packages that are not thread-safe is so significantly dependent on the GIL, that the removal of the GIL will actually engender bugs as well as backward incompatibility issues for your Python programs. A number of Python developers and researchers tried to completely omit the GIL from Python execution, and most existing C extensions, which depend heavily on the functionalities of the GIL, stopped working.
+
+Now there are other viable solutions to address the problems that we have discussed; in other words, the GIL is in every way replaceable. However, most of these solutions contain so many complex instructions that they actually decrease the performance of sequential and I/O-bound programs, which are not affected by the GIL. So, these solutions will slow down single-threaded or multithreaded I/O programs, which actually make up a large percentage of existing Python applications. Interestingly, the creator of Python, Guido van Rossum, also commented on this topic in his article, It isn't Easy to Remove the GIL:
+
+> "I'd welcome a set of patches into Py3k only if the performance for a single-threaded program (and for a multi-threaded but I/O-bound program) does not decrease."
+
+Unfortunately, this request has not been achieved by any of the proposed alternatives to the GIL. The GIL remains an integral part of the Python language.
+
+## How to work with the GIL
+
+There are a few ways to deal with the GIL in your Python applications, which will be addressed as follows.
+
+## Implementing multirpcoessing, rather than multithreading
+
+This is perhaps the most popular and easiest method to circumvent the GIL and achieve optimal speed in a concurrent program. As the GIL only prevents multiple threads from executing CPU-bound tasks simultaneously, processes executing over multiple cores of a system, each having its own memory space, are completely immune to the GIL.
+
+```Python
+import time
+import threading
+from multiprocessing import Pool
+
+COUNT = 50000000
+
+def countdown(n):
+  while n > 0:
+    n -= 1
+
+if __name__ == '__main__':
+  start = time.perf_counter()
+  countdown(COUNT)
+
+  print("Sequential program finished.")
+  print("Took {0:.2f} seconds.".format(time.perf_counter() - start))
+  print()
+
+  thread1 = threading.Thread(target=countdown, args=(COUNT // 2, ))
+  thread2 = threading.Thread(target=countdown, args=(COUNT // 2,))
+
+  start = time.perf_counter()
+
+  thread1.start()
+  thread2.start()
+
+  thread1.join()
+  thread2.join()
+
+  print("Multithreading program finished.")
+  print("Took {0:.2f} seconds".format(time.perf_counter() - start))
+  print()
+
+  pool = Pool(processes=2)
+  start = time.perf_counter()
+  pool.apply_async(countdown, args=(COUNT//2, ))
+  pool.apply_async(countdown, args=(COUNT // 2,))
+  pool.close()
+  pool.join()
+
+  print("Multiprocessing program finished.")
+  print("Took {0:.2f} seconds".format(time.perf_counter() - start))
+```
+
+After running the program, my output was as follows:
+
+```bash
+Sequential program finished.
+Took 2.95 seconds.
+
+Multithreading program finished.
+Took 2.69 seconds.
+
+Multiprocessing program finished.
+Took 1.54 seconds.
+```
+
+There is still a minimal difference in speed between the sequential and multithreading versions of the program. However, the multiprocessing version was able to cut that speed by almost half in its execution; as discussed in earlier chapters; since processes are fairly heavy weight, multiprocessing instructions contain significant overhead, which is the reason why the speed of the multiprocessing program was not exactly half of the sequential program.
+
+## Getting around the GIL with native extensions
+
+There are Python native extensions that are written in C/C++, and are therefore able to avoid the limitations that the GIL sets out; one example is the most popular Python scientific computing package, NumPy. Within these extensions, manual releases of the GIL can be made, so that the execution can simply bypass the lock. However, these releases need to be implemented carefully and accompanied by the reassertion of the GIL before the execution goes back to the main Python execution.
+
+## Utilizing a different Python interpreter
+
+The GIL only exists in CPython, which is the most common interpreter for the language by far, and is built in C. However, there are other interpreters for Python, such as Jython (written in Java) and IronPython (written in C++), that can be used to avoid the GIL and its affects on multithreading programs. Keep in mind that these interpreters are not as widely used as CPython, and some packages and libraries might not be compatible with one or both of them

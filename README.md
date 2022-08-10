@@ -2120,3 +2120,7 @@ There are Python native extensions that are written in C/C++, and are therefore 
 ## Utilizing a different Python interpreter
 
 The GIL only exists in CPython, which is the most common interpreter for the language by far, and is built in C. However, there are other interpreters for Python, such as Jython (written in Java) and IronPython (written in C++), that can be used to avoid the GIL and its affects on multithreading programs. Keep in mind that these interpreters are not as widely used as CPython, and some packages and libraries might not be compatible with one or both of them
+
+# 16. Designing Lock-Based and Mutex-Free Concurrent Data Structures
+
+\-

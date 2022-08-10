@@ -2310,3 +2310,7 @@ Finished.
 ```
 
 Even though some operations in Python are innately atomic, it can be quite difficult to tell whether a given operation is atomic on its own or not. Since the application of nonatomic operations on shared data can lead to race conditions and thus erroneous results, it is always recommended that programmers utilize synchronization mechanisms to ensure the integrity of the shared data within a concurrent program
+
+# 18. Building a Server from Scratch
+
+\-
